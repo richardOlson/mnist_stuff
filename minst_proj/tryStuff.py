@@ -14,7 +14,10 @@ s = np.array([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20])
    # This is the funtion that will create the bounds from where the  first indices
 # within a data window can be.  Then with a random a value will be chosen 
 # from the possible data indices
-def begin_all_in_window(dataLength, all_in_per_data_window:int, data_window_size:int, start_index_of_data_window:int):
+def begin_all_in_window(dataLength, all_in_per_data_window:int, data_window_size:int, 
+                        start_index_of_data_window:int, rand_seed=None):
+    if rand_seed:
+        random.seed(rand_seed)
     # The window end is not included in the window
     windowEnd = start_index_of_data_window + data_window_size
     # This is to make sure that it doesn't overstep the bounds per window
@@ -26,15 +29,17 @@ def begin_all_in_window(dataLength, all_in_per_data_window:int, data_window_size
             all_in_per_data_window = windowEnd - start_index_of_data_window 
 
     end_bound = windowEnd - all_in_per_data_window
+    
     choice = random.randint(start_index_of_data_window, end_bound)
-    return choice
+   
+    return choice, all_in_per_data_window
 
 
 # This is the function that will get the beginning index of the next data window
 # if there is no more data windows will return false
 def get_next_data_window_index(dataSize:int, current_begin_window_index:int, data_window_size:int):
     new_index = current_begin_window_index + data_window_size
-    if new_index >= dataSize or new_index + data_window_size >= dataSize:
+    if new_index >= dataSize: # or new_index + data_window_size >= dataSize:
         return False
     return new_index
     
@@ -42,32 +47,35 @@ def get_next_data_window_index(dataSize:int, current_begin_window_index:int, dat
 
 # This is the function that will return the indices of the data
 # that is in all of the chunks of data.
-def get_in_all_chunks_indices(data, all_in_size:int, num_chunks_estimate:int, chunk_size:int):
+def get_in_all_chunks_indices(data, all_in_size:int, num_chunks_estimate:int, chunk_size:int, rand_seed=None):
     print(f"In the get_in_all_chunks_indices")
     indices_list = []
+    data_length = None
     # checking to see if the data is a tuple
     if isinstance(data, tuple):
         # Will only look at one but the indices can be used
         # for both data and the data_lables
-        data = data[0]
+        data_length = len(data[0])
+    else:
+        data_length = len(data)
     # Will go through the data by quarters
     # from each quarter will grab 2 1/8th of the all_in size
-    data_window_size = int(len(data) /8)
+    data_window_size = int(data_length /8)
     # getting size of 1/8th of the all_in_size
     all_in_per_data_window = int(all_in_size/8)
     start_index_of_data_window = 0
     # doing the loop that will get the indices
     while True:
-        begin_all_in = begin_all_in_window(len(data), all_in_per_data_window, data_window_size, 
-                                            start_index_of_data_window)
-        end = begin_all_in + all_in_per_data_window
+        begin_all_in , all_in_in_the_window = begin_all_in_window(data_length, all_in_per_data_window, data_window_size, 
+                                            start_index_of_data_window, rand_seed=rand_seed)
+        end = begin_all_in + all_in_in_the_window
         # indices_list will contain a tuple of the begin and the end and the range between the two
         indices_list.append((begin_all_in, end, list(range(begin_all_in, end + 1))))
         # indices_to_add = list(range(begin_all_in, end + 1))
         # indices_list += indices_to_add
 
         # moving to the next data window
-        start_index_of_data_window = get_next_data_window_index(len(data), 
+        start_index_of_data_window = get_next_data_window_index(data_length, 
                                                 start_index_of_data_window, data_window_size)
         if not start_index_of_data_window:
             # breaking out if it is false
@@ -107,57 +115,86 @@ def get_data_chunk_size(data_size:int, chunk_size:float, in_all:float):
 # This is the function that will make the data_chunks
 def make_data_chunks(data_length:int, all_in_indices_list:list, orginal_data_size:int,
                         chunked_window_size:int, numChunksEstimated:int):
-    print(f"In the make data_chunks function")
+    
     original_portion_window_size = 0
-    start_for_next_window = 0
+    start_index_for_window = 0
+    current_window_pos = None
     #window_index = 0
     windows_made = 0
     list_of_chunk_indexes = []
     index_pos_choice = 0
+    build_chunks = -1
     # index list
     #indexList = []
     
     # if isinstance(data, np.ndarray):
-    while windows_made < numChunksEstimated or start_for_next_window + original_portion_window_size < data_length: 
+    while build_chunks < 1: 
+        # making it so that when build_chunks flage becomes 0 it will 
+        # not allow anymore times through the while loop  at its current
+        # time.  This is to stop when the data is done
+        if build_chunks == 0:
+            build_chunks = 1
         breakpoint()
+        current_window_pos = start_index_for_window
         chunk_indexes = []
         originalFilled = False
         
-        index_pos_choice = start_for_next_window
+        index_pos_choice = 0
         for i in range(len(all_in_indices_list)):
             begin, end , index_val = all_in_indices_list[i]
+            
             # if the index is less than begin
             # then will add upto the begin
             # and then contiue after the end.
             # if originalFilled but still in the loop then will need to 
             # finish looping through this to fill up the chunk
-            if index_pos_choice == begin or originalFilled:
+             #or originalFilled or index_pos_choice <= start_for_next_window:
+            if index_pos_choice < start_index_for_window:
+                index_pos_choice = begin
+
+            if index_pos_choice == begin:
                 # build some of the chunk
                 chunk_indexes += index_val
                 index_pos_choice = end + 1
-
+            elif originalFilled:
+                # need to fill in the rest of the values
+                chunk_indexes += index_val
+    # TODO need to fix how the start for next window is incremented
             # now building the index list from the 
             # data not in the in_all indexes
             if not originalFilled:
-                for j in range(index_pos_choice, data_length):
+                for j in range(current_window_pos, data_length):
                     if original_portion_window_size >= orginal_data_size:
+                        start_index_for_window += original_portion_window_size
+
+                        if orginal_data_size + start_index_for_window >= data_length:
+                            # In here will set in motion that we only want one more time
+                            # to run and then will be kicked out of the while loop
+                            build_chunks = 0
                         breakpoint()
                         originalFilled = True
                         windows_made +=1  
-                        start_for_next_window += original_portion_window_size
+                        
                         original_portion_window_size = 0
                         #index_pos_choice = start_for_next_window
                         break
-                    if index_pos_choice != begin:
+                    if current_window_pos != begin:
                         # checking to see if we need to check the next batch of in_all indices
                         if i < len(all_in_indices_list) -1:
-                            if index_pos_choice == all_in_indices_list[i+1][0]:
+                            if current_window_pos == all_in_indices_list[i+1][0]:
                                 originalFilled = False
                                 break # breaking out of this loop
-                        # adding one index at a time
-                        chunk_indexes += [j]
+                        if index_pos_choice >= start_index_for_window:
+                            # adding one index at a time
+                            chunk_indexes += [j]
+
+                            # TODO need to fix this line --- index_pos_choice += 1
+                            original_portion_window_size += 1
+                            current_window_pos +=1
+                        # incrementing the index position
                         index_pos_choice += 1
-                        original_portion_window_size += 1
+                    else:
+                        break # breaking out to go to the loop above to grab all in
         # adding this chunk index to the list of chunk indexes
         list_of_chunk_indexes.append(chunk_indexes)
     
@@ -172,7 +209,7 @@ def make_data_chunks(data_length:int, all_in_indices_list:list, orginal_data_siz
 
 # This is the function that will be used to get the data but have it so that there is 
 # some of the data that is mixed in all of the data
-def chunk_shuffle(data, data_chunk_size=None, in_all=None ):
+def chunk_shuffle(data, data_chunk_size=None, in_all=None , rand_seed=None):
     """
     This is the function that will get the data as chunks and having some 
     of the data found in each of the chunks.
@@ -216,7 +253,7 @@ def chunk_shuffle(data, data_chunk_size=None, in_all=None ):
     # indices for some of the data that is in all the chunks
     # This function will check if the data is a tuple, if it is then all the data uses
     # the same indices
-    in_all_indices_list = get_in_all_chunks_indices(data, in_all_size, num_chunks_estimate, chunked_window_size)
+    in_all_indices_list = get_in_all_chunks_indices(data, in_all_size, num_chunks_estimate, chunked_window_size, rand_seed=rand_seed)
 
     # making the data chunks
     # need to make the original_data_size
