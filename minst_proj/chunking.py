@@ -4,6 +4,7 @@ import numpy as np
 import random
 from tensorflow import keras
 import tensorflow
+import operator
 
 
 
@@ -48,7 +49,7 @@ def get_next_data_window_index(dataSize:int, current_begin_window_index:int, dat
 # that is in all of the chunks of data.
 def get_in_all_chunks_indices(data, all_in_size:int, num_chunks_estimate:int, chunk_size:int, rand_seed=None):
     
-    indices_list = []
+    indices_set = set()
     data_length = None
     # checking to see if the data is a tuple
     if isinstance(data, tuple):
@@ -68,8 +69,8 @@ def get_in_all_chunks_indices(data, all_in_size:int, num_chunks_estimate:int, ch
         begin_all_in , all_in_in_the_window = begin_all_in_window(data_length, all_in_per_data_window, data_window_size, 
                                             start_index_of_data_window, rand_seed=rand_seed)
         end = begin_all_in + all_in_in_the_window
-        # indices_list will contain a tuple of the begin and the end and the range between the two
-        indices_list.append((begin_all_in, end, list(range(begin_all_in, end + 1))))
+        # this is a set that will hold the in_all_indices
+        indices_set.update(list(range(begin_all_in, end + 1)))
         
         # moving to the next data window
         start_index_of_data_window = get_next_data_window_index(data_length, 
@@ -78,7 +79,7 @@ def get_in_all_chunks_indices(data, all_in_size:int, num_chunks_estimate:int, ch
             # breaking out if it is false
             break
     
-    return indices_list
+    return indices_set
 
 
 # getting the data_chunk size
@@ -93,17 +94,20 @@ def get_data_chunk_size(data_size:int, chunk_size:float, in_all:float):
 
 
 # This is the function that will make the data_chunks
-def make_data_chunks(data_length:int, all_in_indices_list:list, orginal_data_size:int,
+def make_data_chunks(data_length:int, all_in_indices_set:set, orginal_data_size:int,
                         chunked_window_size:int, numChunksEstimated:int):
     
+    continueMaking = True
+    number_chunks_made = 0
     original_portion_window_size = 0
     start_index_for_window = 0
     current_window_pos = None
     list_of_chunk_indexes = []
     
     build_chunks = -1
+
     
-    while build_chunks < 1: 
+    while continueMaking:
         # making it so that when build_chunks flage becomes 0 it will 
         # not allow anymore times through the while loop  at its current
         # time.  This is to stop when the data is done
@@ -115,21 +119,30 @@ def make_data_chunks(data_length:int, all_in_indices_list:list, orginal_data_siz
         chunk_indexes = set() 
         
         
-        # begin and end are left there for possible use later
-        for i in range(len(all_in_indices_list)):
-            begin, end , index_val = all_in_indices_list[i]
-            # using a set to do the adding of the values
-            chunk_indexes.update(index_val)
-            
+        # # begin and end are left there for possible use later
+        # for i in range(len(all_in_indices_list)):
+        #     begin, end , index_val = all_in_indices_list[i]
+        #     # using a set to do the adding of the values
+        #     chunk_indexes.update(index_val)
+        
+        chunk_indexes.update(all_in_indices_set)
+
         for j in range(current_window_pos, data_length):
             if original_portion_window_size >= orginal_data_size:
                 start_index_for_window += original_portion_window_size
 
                 original_portion_window_size = 0
+                # counting the number of the chunks made
+                number_chunks_made +=1
 
-                if orginal_data_size + start_index_for_window >= data_length:
-                    # going to do just one more chunk
-                    build_chunks = 0
+                if number_chunks_made == numChunksEstimated:
+                    # if in here will loop through the rest of the data
+                    # to use up the left overs
+                    for k in range(current_window_pos, data_length):
+                        if k not in chunk_indexes:
+                            chunk_indexes.add(k)
+                    continueMaking = False
+                    
                 break
 
             # adding to the chunk
@@ -194,12 +207,16 @@ def chunk_shuffle(data, data_chunk_size=None, in_all=None , rand_seed=None):
     # indices for some of the data that is in all the chunks
     # This function will check if the data is a tuple, if it is then all the data uses
     # the same indices
-    in_all_indices_list = get_in_all_chunks_indices(data, in_all_size, num_chunks_estimate, chunked_window_size, rand_seed=rand_seed)
-
+    in_all_indices_set = get_in_all_chunks_indices(data, in_all_size, num_chunks_estimate, chunked_window_size, rand_seed=rand_seed)
+    # Finding the new size of the or
     # making the data chunks
     # need to make the original_data_size
+    size_in_all = len(in_all_indices_set)
+    total_amount_data = data_length - size_in_all
+    
+    original_data_per_window_size = int(total_amount_data / num_chunks_estimate)
     # chunkStart:int, windowSize:int, all_in_indices_list:list,                             original_data_per_chunk:int
-    chunkList = make_data_chunks(data_length, in_all_indices_list, original_data_per_window_size, chunked_window_size,
+    chunkList = make_data_chunks(data_length, in_all_indices_set, original_data_per_window_size, chunked_window_size,
                     num_chunks_estimate)
     
     # will then make the data by using the list for each chunk
@@ -241,6 +258,133 @@ def reshape_data(data, start_index:int, end_index:int ):
     
     return images, labels
 
+
+# below are the functions for finding the weights on the average and also finding the loss
+
+# This is the function that will give the loss or the accuracy in a list
+def get_loss_or_acc(historyList:list, loss=None, acc=None):
+    """
+    param:  Loss should be  the type of loss (string) that is found in the dictionary of history
+            Acc if not None should be a string of the name that person wants to get from the history
+            can only have either the loss or the acc passed in.
+
+    Returns:    Will return a list of the loss or the acc in the order that the histories are passed in.
+                Returns the last value in the history list.
+    """
+    if loss == None and acc == None:
+        raise Exception ("Need to have at either loss or acc not be None")
+    value_list = []
+    item  = loss
+    if acc:
+        item = acc
+    
+    for h in historyList:
+        value_list.append(h.history[item][-1])
+    return value_list
+
+
+# This function will find the average using the loss or the acc 
+# If using the loss the best one is the one with the least loss 
+# If using the acc then the best one is the one with the highest acc
+def get_avg_with_metric(listArr:list, amount:float, loss=None, acc=None ):
+    best_val = None
+    best_arr = 0
+    metric = None
+
+    # this is the number to divide by to get the average
+    divide_for_avg = 0
+    # array that will hold all the values and will hold the end result of the avg 
+    # array
+    avg_arr = np.zeros(shape=listArr[0].shape)
+
+    # the amount will be if you want it to be by the tenth, hundreth or the thousandth
+    # for example .1 is tenth, .01 hundreth, .001 thousandth
+    multiplier =int(1 / amount)
+    # this is used to do the number of loops for adding each array expect the best array
+    loop_num = 0
+    # TODO need to fix this here using the values
+    if loss != None:
+        # loss must be a list
+        # need to find the lowest loss
+        comp = operator.lt
+        metric = loss
+        # setting to a high nunber for the loss to
+        # be able to find something that is lower than this
+        best_val = 1000 
+    else:
+        comp = operator.gt
+        metric = acc
+        best_val = 0
+    # doing the looping find the array that is the best
+    for i, val in enumerate(metric):
+        if comp(val, best_val):
+            best_val = val
+            best_arr = i
+    # adding the correct amount to each of the array
+    for i, arr in enumerate(listArr):
+        if i == best_arr:
+            # doing the best one into the avg_arr
+            divide_for_avg += multiplier
+            for _ in range(multiplier):
+                avg_arr += arr
+        else:
+            if loss != None:
+                # doing a loss
+                loop_num = round(((best_val/loss[i]) * multiplier))
+            else:
+                loop_num = round(((acc[i]/best_val) * multiplier))
+            divide_for_avg += loop_num
+            # doing the looping and adding the array value to a
+            for _ in range(loop_num):
+                avg_arr += arr
+    # will now divide by the number to get the average
+    avg_arr = avg_arr/divide_for_avg
+    return avg_arr
+    
+
+# This makes a list of the numpy array at the correct levl
+def  makeList(allWeights, level:int):
+    theList = []
+    for i in range(len(allWeights)):
+        theList.append(allWeights[i][level])
+    return theList
+
+
+def create_weight_avg(allWeights:list, loss=None, acc=None, amount=None):
+    """
+    Function to create a average of the weights.
+
+    If we want to make the averages based on the loss we put a list of the losses 
+    which will correspond to the weights.  If we want it based on the accuracy, 
+    then we will put in a list of the accuracies for each of the weights.
+
+    Amount is used when doing loss or accuracy.  It is the amount of accuracy or loss precision.
+    can be .1, .01, .001 ect.
+
+    Returns:  will return the new list of the weights which can then be used to set the weights 
+        of the model.
+    """
+    # list of the numpy
+    numpyList = []
+    
+    # doing a loop
+    for i in range(len(allWeights[0])):
+        # making the val a numpy array
+        val = np.zeros(allWeights[0][i].shape)
+        # outher loop doing the number of the numpy arrays in each list  in the list
+        for j in range(len(allWeights)):
+            if loss != None or acc != None:
+                npList = makeList(allWeights, level=i)  
+                # calling the function to get the avg val
+                val = get_avg_with_metric(loss=loss, acc=acc, listArr=npList, amount= amount)
+            else:        
+                val += allWeights[j][i]
+        if loss != None or acc != None:        
+            # finding the average of the weights of one layer
+            val = val/len(allWeights)
+        # putting the val numpy array into the list
+        numpyList.append(val)
+    return numpyList
 
 
 if __name__ == "__main__":
