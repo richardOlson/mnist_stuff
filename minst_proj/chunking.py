@@ -35,6 +35,8 @@ def begin_all_in_window(dataLength, all_in_per_data_window:int, data_window_size
     return choice, all_in_per_data_window
 
 
+
+
 # This is the function that will get the beginning index of the next data window
 # if there is no more data windows will return false
 def get_next_data_window_index(dataSize:int, current_begin_window_index:int, data_window_size:int):
@@ -43,6 +45,8 @@ def get_next_data_window_index(dataSize:int, current_begin_window_index:int, dat
         return False
     return new_index
     
+
+
 
 
 # This is the function that will return the indices of the data
@@ -82,6 +86,8 @@ def get_in_all_chunks_indices(data, all_in_size:int, num_chunks_estimate:int, ch
     return indices_set
 
 
+
+
 # getting the data_chunk size
 def get_data_chunk_size(data_size:int, chunk_size:float, in_all:float):
     chunked_size = int(data_size * chunk_size)
@@ -90,6 +96,7 @@ def get_data_chunk_size(data_size:int, chunk_size:float, in_all:float):
     # finding the number of chunck estimated to make
     num_chunks_estimate = int((data_size - in_all)/ original_data_per_chunk)
     return original_data_per_chunk, chunked_size, in_all, num_chunks_estimate
+
 
 
 
@@ -106,7 +113,6 @@ def make_data_chunks(data_length:int, all_in_indices_set:set, orginal_data_size:
     
     build_chunks = -1
 
-    
     while continueMaking:
         # making it so that when build_chunks flage becomes 0 it will 
         # not allow anymore times through the while loop  at its current
@@ -118,12 +124,6 @@ def make_data_chunks(data_length:int, all_in_indices_set:set, orginal_data_size:
         # This set is where we will be adding each separate chunk to
         chunk_indexes = set() 
         
-        
-        # # begin and end are left there for possible use later
-        # for i in range(len(all_in_indices_list)):
-        #     begin, end , index_val = all_in_indices_list[i]
-        #     # using a set to do the adding of the values
-        #     chunk_indexes.update(index_val)
         
         chunk_indexes.update(all_in_indices_set)
 
@@ -151,31 +151,65 @@ def make_data_chunks(data_length:int, all_in_indices_set:set, orginal_data_size:
                     chunk_indexes.add(j)
                     original_portion_window_size += 1
                 
-
-
         list_of_chunk_indexes.append(list(chunk_indexes))
     
     return list_of_chunk_indexes
 
                     
 
+
     # indexList, window_index = makeIndexList(chunkStart= window_index, windowSize=chunked_window_size,                                         all_in_indices_list=all_in_indices_list,                       original_data_per_chunk=orginal_data_size)
     # need to build one of the chunks
+def chunk_size(data, data_chunk=None, in_all=None):
+    """
+    This function will retrun the estimated sizes of the chunks, the amount of original data in the 
+    chunk and the amount of data that is in all the chunks.
 
-            
+    THESE VALUES ARE NOT EXACT, PARTIALLY BECAUSE MANY TIMES THAT DATA CANNOT BE DIVIDED INTO
+    EQUAL AMOUNTS AMONG EACH OF THE CHUNKS
+    
+
+    :data:  The data to be used.
+
+    :data_chunk:   Float -- .2 will mean that you want each chunks original data to be 20 percent of data
+
+    :in_all:    Float -- .2 means that each chunk will have 20 percent of the total size of the chunk will be
+        found in all the chunks
+    """  
+    if isinstance(data, tuple):
+        data_length = len(data[0])
+    else:
+        data_length = len(data)
+    
+    original_data_per_window_size, chunked_window_size, in_all_size, num_chunks_estimate = get_data_chunk_size(data_length, 
+                                                                                        data_chunk,  in_all)
+
+    # estimating the size of the data that is original
+    available_original = data_length - in_all_size
+    original_data_per_window_size = int(available_original / num_chunks_estimate)
+    chunked_window_size = original_data_per_window_size + in_all_size
+
+    print(f"The estimated data_chunk size will be aproximately ---  {chunked_window_size}")
+    print(f"The estimated size of the original data per data_chunk (window) ---  {original_data_per_window_size}")
+    print(f"The estimated size of data that is found in all (in_all) the data chunks --- {in_all_size}")
+    print(f"The estimated number of trunks made will be --- {num_chunks_estimate}")
+
+
+
+
 
 # This is the function that will be used to get the data but have it so that there is 
 # some of the data that is mixed in all of the data
-def chunk_shuffle(data, data_chunk_size=None, in_all=None , rand_seed=None):
+def chunk_shuffle(data, data_chunk=None, in_all=None , rand_seed=None):
     """
     This is the function that will get the data as chunks and having some 
     of the data found in each of the chunks.
 
     param: data:   The data is the data passed into the function. Not a tuple
 
-    param: data_chunk_size:    This is the size of the data chunk that the function will try to return
+    param: data_chunk:    This is the size of the data chunk that the function will try to return
                         It is not guaranteed to get the exact amount of chunk size depending on the size 
-                        of the data that is passed in the function. Data_chunk_size is a percentage or 
+                        of the data that is passed in the function. Data_chunk is a percentage or 
                         float that will be passed in.  For example if .8 would mean that each chunk_size                            will be 80% of the total data.
 
     param: in_all:             This is the parameter that if passed in will have some of the data that is found in                         all of data chunks.  A float is expected as the variable. This float is as                                  percentage .8 means that each of the chunks will have 80% of the data found in each                         of the data_chunks.
@@ -183,7 +217,7 @@ def chunk_shuffle(data, data_chunk_size=None, in_all=None , rand_seed=None):
 
     :Returns:            Will return a list of data_chunks
     """
-    if data_chunk_size == None:
+    if data_chunk == None:
         raise Exception("You need to pass in a float value for the data_chunk size")
 
     data_length = None
@@ -200,7 +234,7 @@ def chunk_shuffle(data, data_chunk_size=None, in_all=None , rand_seed=None):
         data_length = len(data)
     # getting the sizes used in the making of the chunks
     original_data_per_window_size, chunked_window_size, in_all_size, num_chunks_estimate = get_data_chunk_size(data_length, 
-                                                                                        data_chunk_size,  in_all)
+                                                                                        data_chunk,  in_all)
     
     # getting the random data that is spread through all the data chunks
     # will return a list of tuples, where each tuple has the start and the end
@@ -215,6 +249,10 @@ def chunk_shuffle(data, data_chunk_size=None, in_all=None , rand_seed=None):
     total_amount_data = data_length - size_in_all
     
     original_data_per_window_size = int(total_amount_data / num_chunks_estimate)
+
+    print("\nThese are the real values for the sizes for the data chunks")
+    print(f"The size of data in all chunks is {size_in_all}")
+    print(f"The size of the original data in each chunk is {original_data_per_window_size}")
     # chunkStart:int, windowSize:int, all_in_indices_list:list,                             original_data_per_chunk:int
     chunkList = make_data_chunks(data_length, in_all_indices_set, original_data_per_window_size, chunked_window_size,
                     num_chunks_estimate)
@@ -233,6 +271,8 @@ def chunk_shuffle(data, data_chunk_size=None, in_all=None , rand_seed=None):
             chunked_data_list.append(x)
 
     return chunked_data_list
+
+
 
 # getting the data for another block  that is different from the one that the modle above is trained with.
 def load_images():
@@ -259,6 +299,9 @@ def reshape_data(data, start_index:int, end_index:int ):
     return images, labels
 
 
+
+
+
 # below are the functions for finding the weights on the average and also finding the loss
 
 # This is the function that will give the loss or the accuracy in a list
@@ -281,6 +324,7 @@ def get_loss_or_acc(historyList:list, loss=None, acc=None):
     for h in historyList:
         value_list.append(h.history[item][-1])
     return value_list
+
 
 
 # This function will find the average using the loss or the acc 
@@ -342,12 +386,15 @@ def get_avg_with_metric(listArr:list, amount:float, loss=None, acc=None ):
     return avg_arr
     
 
+
+
 # This makes a list of the numpy array at the correct levl
 def  makeList(allWeights, level:int):
     theList = []
     for i in range(len(allWeights)):
         theList.append(allWeights[i][level])
     return theList
+
 
 
 def create_weight_avg(allWeights:list, loss=None, acc=None, amount=None):
@@ -387,6 +434,8 @@ def create_weight_avg(allWeights:list, loss=None, acc=None, amount=None):
     return numpyList
 
 
+
+
 if __name__ == "__main__":
    
     
@@ -394,7 +443,12 @@ if __name__ == "__main__":
     train, test = load_images()
     print(f"The size of the train set is: ", len(train[0]))
     # trying the chunking and the shuffling of the data
-    train_data = chunk_shuffle(data=train, data_chunk_size=.2, in_all=.13 )
+
+    print(f"This is using the size function to see the size before being used")
+    chunk_size(train, data_chunk=.15, in_all=.13)
+
+    print("\nNow we are doing the chunk_shuffle and will look at the sizes")
+    train_data = chunk_shuffle(data=train, data_chunk=.15, in_all=.13 )
 
     # printing out the length of each of the data
     counter = 1
