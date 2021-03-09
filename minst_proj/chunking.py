@@ -284,17 +284,17 @@ def load_images():
 
 
 
-def reshape_data(data, start_index:int, end_index:int ):
+def reshape_data(data, start_index:int, end_index:int, shape:tuple, rbg_val=255.0 ):
     images = None
     labels = None
     if isinstance(data, tuple):
         images, labels = data
     
     # made the slice to pull from the opposite end
-    images = images[start_index: end_index].reshape(-1, (28 * 28))
+    images = images[start_index: end_index].reshape(-1, shape[0] * shape[1])
     labels = labels[start_index: end_index]
     
-    images = images/255.0
+    images = images/rbg_val
     
     return images, labels
 
@@ -344,9 +344,9 @@ def get_avg_with_metric(listArr:list, amount:float, loss=None, acc=None ):
     # the amount will be if you want it to be by the tenth, hundreth or the thousandth
     # for example .1 is tenth, .01 hundreth, .001 thousandth
     multiplier =int(1 / amount)
-    # this is used to do the number of loops for adding each array expect the best array
+    # this is used to do the number of loops for adding each array exepct the best array
     loop_num = 0
-    # TODO need to fix this here using the values
+    
     if loss != None:
         # loss must be a list
         # need to find the lowest loss
@@ -397,7 +397,7 @@ def  makeList(allWeights, level:int):
 
 
 
-def create_weight_avg(allWeights:list, loss=None, acc=None, amount=None):
+def create_weight_avg(allWeights:list, loss=None, acc=None, amount=None, layers_to_skip=None):
     """
     Function to create a average of the weights.
 
@@ -414,21 +414,36 @@ def create_weight_avg(allWeights:list, loss=None, acc=None, amount=None):
     # list of the numpy
     numpyList = []
     
-    # doing a loop
+    
+    # doing a looping through the weights from each model
     for i in range(len(allWeights[0])):
-        # making the val a numpy array
+        # making the val a numpy array used for holding the average
         val = np.zeros(allWeights[0][i].shape)
         # outher loop doing the number of the numpy arrays in each list  in the list
-        for j in range(len(allWeights)):
-            if loss != None or acc != None:
-                npList = makeList(allWeights, level=i)  
-                # calling the function to get the avg val
-                val = get_avg_with_metric(loss=loss, acc=acc, listArr=npList, amount= amount)
-            else:        
+        if loss != None or acc != None:
+            # makeList will make a list of all the numpy values from each 
+            # of the models passed in at a certain level
+            npList = makeList(allWeights, level=i)  
+            # calling the function to get the avg val of the list of numpy values
+            val = get_avg_with_metric(loss=loss, acc=acc, listArr=npList, amount= amount)
+        else:
+            for j in range(len(allWeights)):
+                # if loss != None or acc != None:
+                    # # makeList will make a list of all the numpy values from each 
+                    # # of the models passed in at a certain level
+                    # npList = makeList(allWeights, level=i)  
+                    # # calling the function to get the avg val of the list of numpy values
+                    # val = get_avg_with_metric(loss=loss, acc=acc, listArr=npList, amount= amount)
+               # else:  
+               # adding the values of from the numpy arrays to get the total of each of the numpy arrays      
                 val += allWeights[j][i]
-        if loss != None or acc != None:        
-            # finding the average of the weights of one layer
+            # making the average when we are not using the loss or the accuracy
             val = val/len(allWeights)
+
+        # if loss != None or acc != None:        
+        #     # finding the average of the weights of one layer
+        #     val = val/len(allWeights)
+
         # putting the val numpy array into the list
         numpyList.append(val)
     return numpyList
