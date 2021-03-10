@@ -307,6 +307,8 @@ def reshape_data(data, start_index:int, end_index:int, shape:tuple, rbg_val=255.
 # This is the function that will give the loss or the accuracy in a list
 def get_loss_or_acc(historyList:list, loss=None, acc=None):
     """
+    This function will return the history or the loss of each of the models.
+
     param:  Loss should be  the type of loss (string) that is found in the dictionary of history
             Acc if not None should be a string of the name that person wants to get from the history
             can only have either the loss or the acc passed in.
@@ -397,7 +399,7 @@ def  makeList(allWeights, level:int):
 
 
 
-def create_weight_avg(allWeights:list, loss=None, acc=None, amount=None, layers_to_skip=None):
+def create_weight_avg(allWeights:list, loss=None, acc=None, amount=None):
     """
     Function to create a average of the weights.
 
